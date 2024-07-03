@@ -53,3 +53,4 @@ export {
 	onDeactivated,
 	onUnmounted
 } from './lifeCycleHooks';
+export { Text, Fragment, Comment } from './nodeType';
