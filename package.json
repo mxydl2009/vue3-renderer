@@ -1,6 +1,6 @@
 {
 	"name": "@mxydl2009/vue3-renderer",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "simulate vue3 renderer for learning",
 	"main": "index.js",
 	"scripts": {
@@ -24,19 +24,19 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@eslint/js": "^9.5.0",
+		"@rollup/plugin-terser": "^0.4.4",
 		"@vue/compiler-dom": "^3.4.30",
 		"@vue/compiler-sfc": "^3.4.30",
 		"eslint": "^9.5.0",
 		"globals": "^15.6.0",
-		"prettier": "^3.3.2",
-		"vite": "^5.3.1",
-		"@rollup/plugin-terser": "^0.4.4",
 		"jsdoc": "^4.0.3",
 		"jsdoc-to-markdown": "^8.0.1",
 		"live-server": "^1.2.2",
 		"nodemon": "^3.1.4",
+		"prettier": "^3.3.2",
 		"rimraf": "^5.0.7",
-		"rollup": "^4.18.0"
+		"rollup": "^4.18.0",
+		"vite": "^5.3.1"
 	},
 	"peerDependencies": {
 		"@mxydl2009/vue3-responsive": "^1.2.1"
