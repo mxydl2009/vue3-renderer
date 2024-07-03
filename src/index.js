@@ -39,6 +39,7 @@ export function createRenderer(renderOptions = WebApi) {
 }
 // webRender目前只能接收vnode类型的数据，因为没有接入编译器
 const webRenderer = createRenderer();
+
 export default webRenderer;
 export { default as KeepAlive } from './KeepAlive';
 export { default as defineAsyncComponent } from './defineAsyncComponent';
@@ -53,4 +54,4 @@ export {
 	onDeactivated,
 	onUnmounted
 } from './lifeCycleHooks';
-export { Text, Fragment, Comment } from './nodeType';
+export * as nodeType from './nodeType';

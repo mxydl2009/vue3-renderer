@@ -1,8 +1,9 @@
 {
 	"name": "@mxydl2009/vue3-renderer",
-	"version": "1.1.0",
+	"version": "1.1.2",
 	"description": "simulate vue3 renderer for learning",
-	"main": "index.js",
+	"type": "module",
+	"module": "dist/renderer.mjs",
 	"scripts": {
 		"dev": "vite",
 		"lint": "eslint --config eslint.config.mjs",
