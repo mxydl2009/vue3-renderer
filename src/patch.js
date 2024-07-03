@@ -11,6 +11,7 @@ export default function patch(n1, n2, container, anchor, renderOptions) {
 		unmount(n1, renderOptions);
 		n1 = null;
 	}
+	if (!n2) return;
 	const { type } = n2;
 	const { createTextNode, insert, setTextNodeValue } = renderOptions;
 	if (typeof type === 'string') {
@@ -58,6 +59,7 @@ export default function patch(n1, n2, container, anchor, renderOptions) {
 					instance.activated && instance.activated.forEach((fn) => fn());
 				}
 				n2.keepAliveInstance._activate(n2, container, anchor);
+				return;
 			}
 			mountComponent(n2, container, anchor, renderOptions);
 		} else {
@@ -279,13 +281,14 @@ function mountComponent(vnode, container, anchor, renderOptions) {
 			if (!instance.isMounted) {
 				beforeMount && beforeMount.call(renderContext);
 
-				patch(null, subTree, container, null, renderOptions);
+				patch(null, subTree, container, anchor, renderOptions);
 				instance.isMounted = true;
 				instance.mounted.length > 0 &&
 					instance.mounted.forEach((fn) => fn.call(renderContext));
 			} else {
 				beforeUpdate && beforeUpdate.call(renderContext);
-				patch(instance.subTree, subTree, container, anchor, renderOptions);
+				const patchAnchor = getAnchor(instance.subTree);
+				patch(instance.subTree, subTree, container, patchAnchor, renderOptions);
 				updated && updated.call(renderContext);
 			}
 			instance.subTree = subTree;
@@ -381,3 +384,23 @@ function shallowReadOnly(data) {
 // 		}
 // 	});
 // }
+
+/**
+ * 获取当前vnode的锚点（insertBefore的anchor锚点）
+ * @param {*} vnode
+ * @returns 返回DOMNode类型
+ */
+function getAnchor(vnode) {
+	if (typeof vnode.type === 'string') {
+		return vnode.el.nextSibling;
+	}
+	if (vnode.type === Fragment) {
+		// 如果是Fragment，则需要从children中查找了，children中获取最后一个type为字符串的元素的el属性
+	}
+	if (typeof vnode === 'object') {
+		// 说明vnode是组件类型, 从组件的subTree开始查找
+		const instance = vnode.component;
+		const subTree = instance.subTree;
+		return getAnchor(subTree);
+	}
+}
