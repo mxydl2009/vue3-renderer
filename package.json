@@ -17,6 +17,9 @@
 		"vue3",
 		"renderer"
 	],
+	"files": [
+		"dist/renderer.mjs"
+	],
 	"author": "mxydl2009@163.com",
 	"license": "MIT",
 	"devDependencies": {
