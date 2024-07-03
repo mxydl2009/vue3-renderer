@@ -1,0 +1,26 @@
+{
+	"name": "@mxydl2009/renderer",
+	"version": "1.0.0",
+	"description": "simulate vue3 renderer for learning",
+	"main": "index.js",
+	"scripts": {
+		"dev": "vite",
+		"lint": "eslint --config eslint.config.mjs"
+	},
+	"keywords": [
+		"vue3",
+		"renderer"
+	],
+	"author": "mxydl2009@163.com",
+	"license": "MIT",
+	"devDependencies": {
+		"@eslint/js": "^9.5.0",
+		"@mxydl2009/vue3-responsive": "^1.2.1",
+		"@vue/compiler-dom": "^3.4.30",
+		"@vue/compiler-sfc": "^3.4.30",
+		"eslint": "^9.5.0",
+		"globals": "^15.6.0",
+		"prettier": "^3.3.2",
+		"vite": "^5.3.1"
+	}
+}
