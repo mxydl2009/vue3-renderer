@@ -1,5 +1,5 @@
 {
-	"name": "@mxydl2009/renderer",
+	"name": "@mxydl2009/vue3-renderer",
 	"version": "1.0.0",
 	"description": "simulate vue3 renderer for learning",
 	"main": "index.js",
