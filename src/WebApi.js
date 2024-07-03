@@ -1,3 +1,10 @@
+/**
+ * @file
+ * 定义渲染器平台的API集合
+ *
+ * @module WebAPI
+ */
+
 const WebApi = {
 	// 创建元素
 	createElement(tag) {

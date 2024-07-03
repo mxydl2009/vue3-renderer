@@ -1,3 +1,8 @@
+/**
+ * @file
+ * 定义diff算法
+ * @module diff
+ */
 import patch from './patch';
 import unmount from './unmount';
 /**
@@ -130,6 +135,8 @@ function isReusable(oldNode, newNode) {
 	const oldNodeKey = oldNode.key;
 	const newNodeKey = newNode.key;
 	if (oldNode.type.name === 'keep-alive' && newNode.type.name === 'keep-alive')
+		return true;
+	if (oldNode.type.name === 'teleport' && newNode.type.name === 'teleport')
 		return true;
 	if (
 		oldNodeKey === undefined ||

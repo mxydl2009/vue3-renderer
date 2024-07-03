@@ -1,5 +1,18 @@
+/**
+ * @file
+ * 定义卸载方法
+ *
+ * @module unmount
+ */
+
 import { Fragment } from './nodeType';
 
+/**
+ * 卸载节点（组件）
+ * @param {*} vnode
+ * @param {*} renderOptions
+ * @returns {undefined}
+ */
 export default function unmount(vnode, renderOptions) {
 	const { removeChildFromParent } = renderOptions;
 	if (typeof vnode.type === 'object') {
@@ -19,7 +32,3 @@ export default function unmount(vnode, renderOptions) {
 		parent && removeChildFromParent(parent, vnode.el);
 	}
 }
-
-// function unmountComponent(vnode, renderOptions) {
-// 	unmount
-// }

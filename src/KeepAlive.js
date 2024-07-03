@@ -1,3 +1,9 @@
+/**
+ * @file
+ * 定义KeepAlive组件
+ *
+ * @module KeepAlive
+ */
 import { currentInstance } from './lifeCycleHooks';
 
 /**

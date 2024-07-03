@@ -1,3 +1,10 @@
+/**
+ * @file
+ * 定义核心的patch方法
+ *
+ * @module patch
+ */
+
 import unmount from './unmount';
 import { Text, Comment, Fragment } from './nodeType';
 import { shallowReactive, effect, enqueue } from '@mxydl2009/vue3-responsive';
@@ -5,6 +12,15 @@ import { setCurrentInstance } from './lifeCycleHooks';
 import KeepAlive from './KeepAlive';
 import { singleEndDiffWithKey } from './diff';
 
+/**
+ * 挂载/更新节点
+ * @param {*} n1 旧节点
+ * @param {*} n2 新节点
+ * @param {*} container 容器
+ * @param {*} anchor 挂载锚点
+ * @param {*} renderOptions 渲染器平台API集合
+ * @returns {undefined}
+ */
 export default function patch(n1, n2, container, anchor, renderOptions) {
 	if (n1 && n1.type !== n2.type) {
 		// 说明n1和n2不是同种元素
@@ -49,6 +65,27 @@ export default function patch(n1, n2, container, anchor, renderOptions) {
 		}
 	} else if (typeof type === 'object') {
 		// 组件, 使用选项对象描述的类型
+		if (type.__isTeleport) {
+			// Teleport组件的处理
+			type.process(
+				n1,
+				n2,
+				{
+					patch,
+					patchChildren,
+					unmount,
+					move(vnode, container, anchor) {
+						insert(
+							vnode.component ? vnode.component.subTree.el : vnode.el,
+							container,
+							anchor
+						);
+					}
+				},
+				renderOptions
+			);
+			return;
+		}
 		if (!n1) {
 			if (n2.keptAlive) {
 				// 说明该组件被keepAlive了，不需要重新挂载，而是激活
@@ -68,6 +105,14 @@ export default function patch(n1, n2, container, anchor, renderOptions) {
 	}
 }
 
+/**
+ * 挂载DOM元素类型的节点
+ * @param {*} vnode 节点
+ * @param {*} container 容器
+ * @param {*} anchor 锚点
+ * @param {*} renderOptions 渲染器平台
+ * @returns {undefined}
+ */
 function mountElement(vnode, container, anchor, renderOptions) {
 	const { createElement, setElementText, insert, patchProp } = renderOptions;
 	const el = (vnode.el = createElement(vnode.type));
@@ -91,6 +136,12 @@ function mountElement(vnode, container, anchor, renderOptions) {
 	return container;
 }
 
+/**
+ * 更新元素类型的节点
+ * @param {*} n1 旧节点
+ * @param {*} n2 新节点
+ * @param {*} renderOptions 渲染器API
+ */
 function patchElement(n1, n2, renderOptions) {
 	const { patchProp } = renderOptions;
 	const el = (n2.el = n1.el);
@@ -110,6 +161,13 @@ function patchElement(n1, n2, renderOptions) {
 	patchChildren(n1, n2, el, renderOptions);
 }
 
+/**
+ * 更新新旧节点的子节点
+ * @param {*} n1 旧节点
+ * @param {*} n2 新节点
+ * @param {*} el 容器
+ * @param {*} renderOptions 渲染器API
+ */
 function patchChildren(n1, n2, el, renderOptions) {
 	const { setElementText } = renderOptions;
 	if (typeof n2.children === 'string') {
@@ -141,6 +199,13 @@ function patchChildren(n1, n2, el, renderOptions) {
 	}
 }
 
+/**
+ * 组件挂载
+ * @param {*} vnode 组件节点
+ * @param {*} container 容器
+ * @param {*} anchor 锚点
+ * @param {*} renderOptions 渲染器API
+ */
 function mountComponent(vnode, container, anchor, renderOptions) {
 	// 挂载组件
 	const componentOption = vnode.type;
@@ -158,7 +223,8 @@ function mountComponent(vnode, container, anchor, renderOptions) {
 		beforeUpdate,
 		updated,
 		activated,
-		deactivated
+		deactivated,
+		unMounted
 	} = componentOption;
 
 	function emit(eventName, ...payload) {
@@ -184,16 +250,16 @@ function mountComponent(vnode, container, anchor, renderOptions) {
 		state,
 		props: shallowReactive(resolvedProps),
 		methods,
-		created: [],
+		beforeCreate: [beforeCreate].filter((fn) => fn !== undefined),
+		created: [created].filter((fn) => fn !== undefined),
 		deactivated: [deactivated].filter((fn) => fn !== undefined),
 		activated: [activated].filter((fn) => fn !== undefined),
 		mounted: [mounted].filter((fn) => fn !== undefined),
-		unMounted: [],
-		updated: [],
+		unMounted: [unMounted].filter((fn) => fn !== undefined),
+		beforeUpdate: [beforeUpdate].filter((fn) => fn !== undefined),
+		updated: [updated].filter((fn) => fn !== undefined),
 		slots,
 		subTree: null
-		// 组件挂载的锚点
-		// anchor: null
 	};
 
 	if (vnode.type === KeepAlive) {
@@ -302,6 +368,12 @@ function mountComponent(vnode, container, anchor, renderOptions) {
 	);
 }
 
+/**
+ * 更新组件
+ * @param {*} n1 新节点
+ * @param {*} n2 旧节点
+ * @returns {undefined}
+ */
 function patchComponent(n1, n2) {
 	function isEmpty(value) {
 		return value === null || value === undefined;
@@ -362,6 +434,11 @@ function propsHasChanged(prevProps, nextProps) {
 	return false;
 }
 
+/**
+ * 浅层冻结数据
+ * @param {object} data
+ * @returns {object}
+ */
 function shallowReadOnly(data) {
 	for (const key in data) {
 		if (Object.hasOwnProperty.call(data, key)) {
@@ -388,7 +465,7 @@ function shallowReadOnly(data) {
 /**
  * 获取当前vnode的锚点（insertBefore的anchor锚点）
  * @param {*} vnode
- * @returns 返回DOMNode类型
+ * @returns {DOMNode} 返回DOMNode类型
  */
 function getAnchor(vnode) {
 	if (typeof vnode.type === 'string') {
