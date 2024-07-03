@@ -2,10 +2,6 @@ import patch from './patch';
 import unmount from './unmount';
 import WebApi from './WebApi';
 
-// window.addEventListener('unhandledrejection', (e) => {
-// 	console.log('unhandledrejection', e);
-// });
-
 export function createRenderer(renderOptions = WebApi) {
 	return {
 		render(vnode, container) {
