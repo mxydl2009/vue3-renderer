@@ -1,13 +1,13 @@
 /**
- * @file
- * 定义diff算法
- * @module diff
+ * @file 定义diff算法
+ *
  */
 import patch from './patch';
 import unmount from './unmount';
 /**
  * ### 不使用key来标记节点时的diff算法
- * 核心思想: 因为没有key的帮助，无法识别新旧节点列表中，究竟哪些节点是可以复用的，所以依次按照顺序对比patch
+ * #### 核心思想
+ * - 因为没有key的帮助，无法识别新旧节点列表中，究竟哪些节点是可以复用的，所以依次按照顺序对比patch
  * @param {*} n1 旧的父节点
  * @param {*} n2 新的父节点
  * @param {DOMElement} 子节点集的父DOM容器
@@ -127,6 +127,7 @@ export function singleEndDiffWithKey(n1, n2, container, renderOptions) {
 }
 
 /**
+ * #### 判断两个节点之间是否可复用
  * 根据key值和node.type来判断两个节点是否可以复用
  * @param {*} oldNode 旧节点
  * @param {*} newNode 新节点
@@ -150,8 +151,10 @@ function isReusable(oldNode, newNode) {
 }
 
 /**
- * 核心思想: 针对单端diff的劣势(新的子节点集中的头部节点是旧的子节点集中的尾部的情况，需要多次移动操作), 减少移动操作的次数;
- * 根据针对的场景，因此要进行双端比对。如果双端比对命中，那么移动操作的优化就会生效。如果双端比对未命中，则退化为遍历旧子节点集来寻找可复用节点;
+ * ### 双端diff算法
+ * #### 核心思想:
+ * - 针对单端diff的劣势(新的子节点集中的头部节点是旧的子节点集中的尾部的情况，需要多次移动操作), 减少移动操作的次数;
+ * - 根据针对的场景，因此要进行双端比对。如果双端比对命中，那么移动操作的优化就会生效。如果双端比对未命中，则退化为遍历旧子节点集来寻找可复用节点;
  */
 export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 	const { insert } = renderOptions;
@@ -256,4 +259,203 @@ export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 			unmount(oldChildren[i], renderOptions);
 		}
 	}
+}
+
+/**
+ * ### 快速diff算法
+ *
+ * #### 核心思想
+ *
+ * - 借鉴了文本diff的思想，对节点集进行前置相同和后置相同的预处理判断;
+ * - 前置和后置相同判断，从而消费了前置和后置节点后，再继续diff;
+ */
+export function quickDiffWithKey(n1, n2, container, renderOptions) {
+	const { insert } = renderOptions;
+	// 对children的元素进行过滤
+	const oldChildren = n1.children.filter(
+		(c) => typeof c === 'string' || (typeof c === 'object' && c !== null)
+	);
+	const newChildren = n2.children.filter(
+		(c) => typeof c === 'string' || (typeof c === 'object' && c !== null)
+	);
+	const oldLen = oldChildren.length;
+	const newLen = newChildren.length;
+
+	// 先进行前置节点的预处理
+	let j = 0;
+	while (isReusable(newChildren[j], oldChildren[j])) {
+		// 如果前置节点可以复用，那么patch，并且继续循环
+		patch(oldChildren[j], newChildren[j], container, null, renderOptions);
+		j++;
+	}
+
+	// 再进行后置节点的预处理, 由于新旧节点集的数量不一样，所以需要两个变量来记录后置的索引
+	let newEndIndex = newLen - 1;
+	let oldEndIndex = oldLen - 1;
+	while (isReusable(newChildren[newEndIndex], oldChildren[oldEndIndex])) {
+		patch(
+			oldChildren[oldEndIndex],
+			newChildren[newEndIndex],
+			container,
+			null,
+			renderOptions
+		);
+
+		newEndIndex--;
+		oldEndIndex--;
+	}
+
+	/**
+	 * 预处理结束后，继续diff
+	 * - 如果是旧节点被处理完，那么剩下的新节点需要挂载;
+	 * - 如果是新节点被处理完，那么剩下的旧节点需要被卸载;
+	 */
+
+	if (oldEndIndex < j && j <= newEndIndex) {
+		// 此时旧节点被处理完，剩余的新节点需要挂载
+		for (let i = j; i <= newEndIndex; i++) {
+			/**
+			 * 锚点
+			 * - 如果newEndIndex是最后一个元素的索引，那么锚点应该是null，因为要挂载到父节点的末尾
+			 * - 如果newEndIndex非最后一个元素的索引，那么锚点应该是newEndIndex + 1的元素，因为该元素已被处理，el属性有值
+			 */
+			const anchor =
+				newEndIndex + 1 === newLen ? null : newChildren[newEndIndex + 1].el;
+			patch(null, newChildren[i], container, anchor, renderOptions);
+		}
+	} else if (newEndIndex < j && j <= oldEndIndex) {
+		// 此时新节点被处理完，剩余的旧节点需要卸载
+		for (let i = j; j <= oldEndIndex; i++) {
+			unmount(oldChildren[i], renderOptions);
+		}
+	} else {
+		// 此时，预处理完后，新旧节点都有剩余，这是更一般的情况
+		// 新节点集在预处理后，待更新的数量
+		const count = newEndIndex - j + 1;
+		// 构建source数据，记录新节点在旧节点集中的索引: source的索引从0开始, 也是从j指向的节点开始
+		const source = new Array(count);
+		// 初始化填充为-1，另外，如果索引为-1，表示新节点不在旧节点中，说明该新节点是新增的，要挂载
+		source.fill(-1);
+		/**
+		 * 为了提高性能，先根据新节点的key来构建一个Map<key, index>的映射表，方便后期遍历旧节点时根据key查询新节点集中是否有可复用节点
+		 *
+		 */
+		const keyToIndex = new Map();
+		for (let i = j; i <= newEndIndex; i++) {
+			const newVNode = newChildren[i];
+			if (typeof newVNode.key !== 'undefined' && newVNode.key !== null) {
+				keyToIndex.set(newVNode.key, i);
+			}
+		}
+
+		let lastIndex = oldEndIndex - j;
+		let needMove = false;
+		// 遍历旧子节点，查找可复用节点，更新source数组，根据source数组来确定如何移动可复用节点
+		for (let i = j; i <= oldEndIndex; i++) {
+			const oldVNode = oldChildren[i];
+			const indexInNew = keyToIndex.get(oldVNode.key);
+
+			if (typeof indexInNew !== 'undefined') {
+				// 找到可复用节点
+				const newVNode = newChildren[indexInNew];
+				// patch
+				patch(oldVNode, newVNode, container, null, renderOptions);
+				// 更新source数组, 记录当前新节点在旧节点集中的索引
+				source[indexInNew - j] = i;
+				// 判断是否需要移动, 与单端diff的判断方式一样，只是这次是遍历旧节点集，而非新节点集
+				if (indexInNew < lastIndex) {
+					// 当前
+					needMove = true;
+				} else {
+					lastIndex = indexInNew;
+				}
+			} else {
+				// 没找到可复用节点，说明旧节点要卸载
+				unmount(oldVNode, renderOptions);
+			}
+		}
+
+		if (needMove) {
+			// 根据source数组来移动元素, source元素记录了新节点在旧节点中的索引值
+			// 计算source数组的最长递增子序列，sequence是子序列元素对应的索引
+			// 如source: [0, 8, 4, 12] 最长递增子序列: [0, 8, 12], sequence: [0, 1, 3]
+			const sequence = lis(source);
+
+			// 从count - 1的索引开始，递减遍历
+			let index = count - 1;
+			// s表示最长递增子序列的最后一个元素索引, sequence[s]之后的节点都需要移动
+			let s = sequence.length - 1;
+			while (index >= 0) {
+				if (source[index] === -1) {
+					// 挂载新节点
+					// 找到新节点的索引
+					const position = index + j;
+					const newVNode = newChildren[position];
+					const anchor =
+						position + 1 === newLen ? null : newChildren[position + 1].el;
+					insert(newVNode, container, anchor);
+				} else if (index !== sequence[s]) {
+					// 移动
+					const position = index + j;
+					const newVNode = newChildren[position];
+					const anchor =
+						position + 1 === newLen ? null : newChildren[position + 1].el;
+					insert(newVNode, container, anchor);
+				} else {
+					// 不移动，s递减
+					s--;
+				}
+				index--;
+			}
+		}
+	}
+}
+
+/**
+ * ### 求解最长递增子序列
+ *
+ * **来自vue.js version 3**
+ * @returns
+ */
+function lis(arr) {
+	const p = arr.slice();
+	const result = [0];
+	let i, j, u, v, c;
+	const len = arr.length;
+
+	for (i = 0; i < len; i++) {
+		const arrI = arr[i];
+		if (arrI !== 0) {
+			j = result[result.length - 1];
+			if (arr[j] < arrI) {
+				p[i] = j;
+				result.push(i);
+				continue;
+			}
+			u = 0;
+			v = result.length - 1;
+			while (u < v) {
+				c = ((u + v) / 2) | 0;
+				if (arr[result[c]] < arrI) {
+					u = c + 1;
+				} else {
+					v = c;
+				}
+			}
+			if (arrI < arr[result[u]]) {
+				if (u > 0) {
+					p[i] = result[u - 1];
+				}
+				result[u] = i;
+			}
+		}
+	}
+
+	u = result.length;
+	v = result[u - 1];
+	while (u-- > 0) {
+		result[u] = v;
+		v = p[v];
+	}
+	return result;
 }
