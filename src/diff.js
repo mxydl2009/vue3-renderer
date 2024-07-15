@@ -10,6 +10,7 @@ import unmount from './unmount';
  * 核心思想: 因为没有key的帮助，无法识别新旧节点列表中，究竟哪些节点是可以复用的，所以依次按照顺序对比patch
  * @param {*} n1 旧的父节点
  * @param {*} n2 新的父节点
+ * @param {DOMElement} 子节点集的父DOM容器
  */
 export function diffWithoutKey(n1, n2, container, renderOptions) {
 	const oldChildren = n1.children;
@@ -146,4 +147,113 @@ function isReusable(oldNode, newNode) {
 	)
 		return false;
 	return newNodeKey === oldNodeKey && newNode.type === oldNode.type;
+}
+
+/**
+ * 核心思想: 针对单端diff的劣势(新的子节点集中的头部节点是旧的子节点集中的尾部的情况，需要多次移动操作), 减少移动操作的次数;
+ * 根据针对的场景，因此要进行双端比对。如果双端比对命中，那么移动操作的优化就会生效。如果双端比对未命中，则退化为遍历旧子节点集来寻找可复用节点;
+ */
+export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
+	const { insert } = renderOptions;
+	// 对children的元素进行过滤
+	const oldChildren = n1.children.filter(
+		(c) => typeof c === 'string' || (typeof c === 'object' && c !== null)
+	);
+	const newChildren = n2.children.filter(
+		(c) => typeof c === 'string' || (typeof c === 'object' && c !== null)
+	);
+	const oldLen = oldChildren.length;
+	const newLen = newChildren.length;
+
+	let newStartIndex = 0,
+		newEndIndex = newLen - 1,
+		oldStartIndex = 0,
+		oldEndIndex = oldLen - 1;
+
+	/**
+	 * 双端diff终止条件: 新子节点集或者旧子节点集遍历结束
+	 */
+	while (newStartIndex <= newEndIndex || oldStartIndex <= oldEndIndex) {
+		const newStartVNode = newChildren[newStartIndex];
+		const newEndVNode = newChildren[newEndIndex];
+		const oldStartVNode = oldChildren[oldStartIndex];
+		const oldEndVNode = oldChildren[oldEndIndex];
+		// 尝试查找可复用节点
+		if (isReusable(newStartVNode, oldStartVNode)) {
+			// 新旧的头部节点一样，可复用, 只patch，不移动
+			patch(oldStartVNode, newStartVNode, container, null, renderOptions);
+
+			newStartIndex++;
+			oldStartIndex++;
+		} else if (isReusable(newStartVNode, oldEndVNode)) {
+			// 新头部节点与旧尾部节点一样，可复用，patch，移动
+			patch(oldEndVNode, newStartVNode, container, null, renderOptions);
+			// 锚点为旧头部节点
+			const anchor = oldStartVNode.el;
+			// 将旧尾部节点对应的DOM节点，移动到旧头部节点DOM的前面
+			insert(oldEndVNode.el, container, anchor);
+
+			newStartIndex++;
+			oldEndIndex--;
+		} else if (isReusable(newEndVNode, oldStartVNode)) {
+			// 新尾部与旧头部一样，可复用，patch，移动
+			patch(oldEndVNode, newEndVNode, container, null, renderOptions);
+			// 把旧头部对应的DOM移到末尾
+			insert(oldEndVNode.el, container, null);
+
+			newEndIndex--;
+			oldStartIndex++;
+		} else if (isReusable(newEndVNode, oldEndVNode)) {
+			// 新旧尾部一样，patch，不移动
+			patch(oldEndVNode, newEndVNode, container, null, renderOptions);
+
+			newEndIndex--;
+			oldEndIndex--;
+		} else {
+			// 双端比对后，未找到可复用节点, 退化为遍历旧子节点集来查找可复用节点
+			const oldReusableVNodeIndex = oldChildren.findIndex((oldChild) =>
+				isReusable(newStartVNode, oldChild)
+			);
+			if (oldReusableVNodeIndex > 0) {
+				// 找到可复用节点, patch，移动
+				const oldReusableVNode = oldChildren[oldReusableVNodeIndex];
+				patch(oldReusableVNode, newStartVNode, container, null, renderOptions);
+
+				// 锚点必须是旧子节点集的节点对应的DOM，因为新子节点还未挂载，el为undefined，因为此时对比的是newStartVNode，所以锚点是头部节点对应的DOM
+				const anchor = oldStartVNode.el;
+				// 将oldReusableVNodeIndex对应的DOM节点，移到头部节点对应的DOM
+				insert(oldReusableVNode, container, anchor);
+
+				// 将处理过的旧子节点置为undefined
+				oldChildren[oldReusableVNodeIndex] = undefined;
+
+				newStartIndex++;
+			} else {
+				// 如果没有找到可复用节点，那么该节点需要新挂载
+				const anchor = oldStartVNode.el;
+				patch(null, newStartVNode, container, anchor, renderOptions);
+			}
+		}
+	}
+
+	// 如果双端diff终止了，newStartIndex < newEndIndex，说明这些在[newStartIndex, newEndIndex]的新节点需要挂载
+	if (newStartIndex <= newEndIndex) {
+		// 挂载剩余新节点
+		for (let i = newStartIndex; i <= newEndIndex; i++) {
+			patch(
+				null,
+				newChildren[i],
+				container,
+				newChildren[i - 1].el,
+				renderOptions
+			);
+		}
+	}
+
+	// 如果双端diff终止了，oldStartIndex < oldEndIndex, 说明这些在[oldStartIndex, oldEndIndex]的旧节点需要卸载
+	if (oldStartIndex <= oldEndIndex) {
+		for (let i = oldStartIndex; i <= oldEndIndex; i++) {
+			unmount(oldChildren[i], renderOptions);
+		}
+	}
 }
