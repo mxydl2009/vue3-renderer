@@ -17,7 +17,7 @@ const WebApi = {
 		el.textContent = text;
 	},
 	setTextNodeValue(textNode, content) {
-		textNode.value = content;
+		textNode.nodeValue = content;
 	},
 	insert(node, parent, anchor = null) {
 		parent.insertBefore(node, anchor);
