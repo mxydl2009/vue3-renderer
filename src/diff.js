@@ -402,14 +402,16 @@ export function quickDiffWithKey(n1, n2, container, renderOptions) {
 					const newVNode = newChildren[position];
 					const anchor =
 						position + 1 === newLen ? null : newChildren[position + 1].el;
-					insert(newVNode, container, anchor);
+					patch(null, newVNode, container, anchor, renderOptions);
 				} else if (index !== sequence[s]) {
-					// 移动
+					// 移动, 先获取新节点，然后根据新节点获取对应可复用的老节点
 					const position = index + j;
 					const newVNode = newChildren[position];
 					const anchor =
 						position + 1 === newLen ? null : newChildren[position + 1].el;
-					insert(newVNode, container, anchor);
+					// 因为可复用节点已经被patch过了，所以新节点上也有了el属性，这里就可以用新节点的el属性来移动了
+					// 如果没有被patch，那么就得根据新节点找到旧节点，使用旧节点的el属性了
+					insert(newVNode.el, container, anchor);
 				} else {
 					// 不移动，s递减
 					s--;

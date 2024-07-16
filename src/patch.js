@@ -10,7 +10,8 @@ import { Text, Comment, Fragment } from './nodeType';
 import { shallowReactive, effect, enqueue } from '@mxydl2009/vue3-responsive';
 import { setCurrentInstance } from './lifeCycleHooks';
 import KeepAlive from './KeepAlive';
-import { singleEndDiffWithKey } from './diff';
+// import { singleEndDiffWithKey } from './diff';
+import { quickDiffWithKey } from './diff';
 
 /**
  * 挂载/更新节点
@@ -181,7 +182,8 @@ function patchChildren(n1, n2, el, renderOptions) {
 			// 新旧子节点都会一组节点，diff
 			// n1.children.forEach((c) => unmount(c, renderOptions));
 			// n2.children.forEach((c) => patch(null, c, el, anchor, renderOptions));
-			singleEndDiffWithKey(n1, n2, el, renderOptions);
+			// singleEndDiffWithKey(n1, n2, el, renderOptions);
+			quickDiffWithKey(n1, n2, el, renderOptions);
 		} else {
 			setElementText(el, '');
 			// 将n2的子节点依次挂载
