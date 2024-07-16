@@ -4,6 +4,7 @@
  */
 import patch from './patch';
 import unmount from './unmount';
+import lis from './lis';
 /**
  * ### 不使用key来标记节点时的diff算法
  * #### 核心思想
@@ -181,6 +182,14 @@ export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 		const newEndVNode = newChildren[newEndIndex];
 		const oldStartVNode = oldChildren[oldStartIndex];
 		const oldEndVNode = oldChildren[oldEndIndex];
+		if (typeof oldStartVNode === 'undefined') {
+			oldStartIndex++;
+			continue;
+		}
+		if (typeof oldEndVNode === 'undefined') {
+			oldEndIndex--;
+			continue;
+		}
 		// 尝试查找可复用节点
 		if (isReusable(newStartVNode, oldStartVNode)) {
 			// 新旧的头部节点一样，可复用, 只patch，不移动
@@ -200,9 +209,9 @@ export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 			oldEndIndex--;
 		} else if (isReusable(newEndVNode, oldStartVNode)) {
 			// 新尾部与旧头部一样，可复用，patch，移动
-			patch(oldEndVNode, newEndVNode, container, null, renderOptions);
+			patch(oldStartVNode, newEndVNode, container, null, renderOptions);
 			// 把旧头部对应的DOM移到末尾
-			insert(oldEndVNode.el, container, null);
+			insert(oldStartVNode.el, container, null);
 
 			newEndIndex--;
 			oldStartIndex++;
@@ -225,7 +234,7 @@ export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 				// 锚点必须是旧子节点集的节点对应的DOM，因为新子节点还未挂载，el为undefined，因为此时对比的是newStartVNode，所以锚点是头部节点对应的DOM
 				const anchor = oldStartVNode.el;
 				// 将oldReusableVNodeIndex对应的DOM节点，移到头部节点对应的DOM
-				insert(oldReusableVNode, container, anchor);
+				insert(oldReusableVNode.el, container, anchor);
 
 				// 将处理过的旧子节点置为undefined
 				oldChildren[oldReusableVNodeIndex] = undefined;
@@ -239,7 +248,7 @@ export function dualEndDiffWithKey(n1, n2, container, renderOptions) {
 		}
 	}
 
-	// 如果双端diff终止了，newStartIndex < newEndIndex，说明这些在[newStartIndex, newEndIndex]的新节点需要挂载
+	// 如果双端diff终止了，newStartIndex <= newEndIndex，说明这些在[newStartIndex, newEndIndex]的新节点需要挂载
 	if (newStartIndex <= newEndIndex) {
 		// 挂载剩余新节点
 		for (let i = newStartIndex; i <= newEndIndex; i++) {
@@ -409,53 +418,4 @@ export function quickDiffWithKey(n1, n2, container, renderOptions) {
 			}
 		}
 	}
-}
-
-/**
- * ### 求解最长递增子序列
- *
- * **来自vue.js version 3**
- * @returns
- */
-function lis(arr) {
-	const p = arr.slice();
-	const result = [0];
-	let i, j, u, v, c;
-	const len = arr.length;
-
-	for (i = 0; i < len; i++) {
-		const arrI = arr[i];
-		if (arrI !== 0) {
-			j = result[result.length - 1];
-			if (arr[j] < arrI) {
-				p[i] = j;
-				result.push(i);
-				continue;
-			}
-			u = 0;
-			v = result.length - 1;
-			while (u < v) {
-				c = ((u + v) / 2) | 0;
-				if (arr[result[c]] < arrI) {
-					u = c + 1;
-				} else {
-					v = c;
-				}
-			}
-			if (arrI < arr[result[u]]) {
-				if (u > 0) {
-					p[i] = result[u - 1];
-				}
-				result[u] = i;
-			}
-		}
-	}
-
-	u = result.length;
-	v = result[u - 1];
-	while (u-- > 0) {
-		result[u] = v;
-		v = p[v];
-	}
-	return result;
 }
