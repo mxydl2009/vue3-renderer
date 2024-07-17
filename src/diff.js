@@ -393,6 +393,7 @@ export function quickDiffWithKey(n1, n2, container, renderOptions) {
 			// 从count - 1的索引开始，递减遍历
 			let index = count - 1;
 			// s表示最长递增子序列的最后一个元素索引, sequence[s]之后的节点都需要移动
+			// 最长递增子序列的意义就是, 让移动的操作最少
 			let s = sequence.length - 1;
 			while (index >= 0) {
 				if (source[index] === -1) {
